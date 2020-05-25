@@ -1,5 +1,6 @@
 # Databricks notebook source
 # source : https://medium.com/ai-society/gans-from-scratch-1-a-deep-introduction-with-code-in-pytorch-and-tensorflow-cb03cdcdba0f
+# updated - Ryan Simpson: added path to set output to dbfs fuse mount
 import os
 import numpy as np
 import errno
@@ -16,9 +17,11 @@ import torch
 
 class Logger:
 
-    def __init__(self, model_name, data_name):
+    def __init__(self, model_name, data_name, data_path_root):
+      
         self.model_name = model_name
         self.data_name = data_name
+        self.data_path_root = data_path_root
 
         self.comment = '{}_{}'.format(model_name, data_name)
         self.data_subdir = '{}/{}'.format(model_name, data_name)
@@ -69,7 +72,7 @@ class Logger:
         self.save_torch_images(horizontal_grid, grid, epoch, n_batch)
 
     def save_torch_images(self, horizontal_grid, grid, epoch, n_batch, plot_horizontal=True):
-        out_dir = './data/images/{}'.format(self.data_subdir)
+        out_dir = '{}/data/images/{}'.format(self.data_path_root, self.data_subdir)
         Logger._make_dir(out_dir)
 
         # Plot and save horizontal
@@ -89,7 +92,7 @@ class Logger:
         plt.close()
 
     def _save_images(self, fig, epoch, n_batch, comment=''):
-        out_dir = './data/images/{}'.format(self.data_subdir)
+        out_dir = '{}/data/images/{}'.format(self.data_path_root, self.data_subdir)
         Logger._make_dir(out_dir)
         fig.savefig('{}/{}_epoch_{}_batch_{}.png'.format(out_dir,
                                                          comment, epoch, n_batch))
@@ -114,7 +117,7 @@ class Logger:
         print('D(x): {:.4f}, D(G(z)): {:.4f}'.format(d_pred_real.mean(), d_pred_fake.mean()))
 
     def save_models(self, generator, discriminator, epoch):
-        out_dir = './data/models/{}'.format(self.data_subdir)
+        out_dir = '{}/data/models/{}'.format(self.data_path_root, self.data_subdir)
         Logger._make_dir(out_dir)
         torch.save(generator.state_dict(),
                    '{}/G_epoch_{}'.format(out_dir, epoch))
