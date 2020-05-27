@@ -26,11 +26,14 @@ class Logger:
         self.comment = '{}_{}'.format(model_name, data_name)
         self.data_subdir = '{}/{}'.format(model_name, data_name)
         
+        # probably not best practice, but the closest I can get to a debug.writeline() (?)
+        print('Logger outputs:')
         print('data_path_root: {}'.format(self.data_path_root))
         print('image save location: {}/data/images/{}'.format(self.data_path_root, self.data_subdir))
 
         # TensorBoard
         # maybe consider moving this to MLFlow?
+        # although tensor board seems to allow me to view output images as-well - check out the params on the writer
         self.writer = SummaryWriter(comment=self.comment)
 
     def log(self, d_error, g_error, epoch, n_batch, num_batches):
