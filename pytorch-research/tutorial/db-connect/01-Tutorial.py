@@ -39,30 +39,40 @@
 
 # working with MLRuntime 6.5 so have tensorFlow and Pytorch already available
 
+# seems the client environment must match the target environment
+# so make sure these are installed locally:
 import torch
 from torch import nn, optim
 from torch.autograd.variable import Variable
 from torchvision import transforms,datasets
 
-# COMMAND ----------
+# environment setup for databricks connect:
+# https://docs.databricks.com/dev-tools/databricks-connect.html
 
-# note the use of the dbfs prefix here to allow us to use local file APIs to talk through the fuze mount:
-# https://docs.databricks.com/data/databricks-file-system.html#fuse
-dbutils.fs.mkdirs('/tmp/ryansimpson/dataset')
+# install requirements using 
+# pip install -r pytorch-research/tutorial/db-connect/requirements.txt
 
-# COMMAND ----------
+# ensure you've run source ~/db-connect.sh before running pyspark
 
-def mnist_data():
-    compose = transforms.Compose(
-        [transforms.ToTensor(),
-         # transforms.Normalize((.5, .5, .5), (.5, .5, .5)) # expecting a gray-scale image? - see https://github.com/yunjey/pytorch-tutorial/issues/161#issuecomment-574908584
-         transforms.Normalize([.5,], [.5,]) # expecting a gray-scale image?
-         
-        ])
-    out_dir = '/dbfs/tmp/ryansimpson/dataset'
-    return datasets.MNIST(root=out_dir, train=True, transform=compose, download=True)
-# Load data
-data = mnist_data()
+# session set-up:
+from pyspark.dbutils import DBUtils
+dbutils = DBUtils(spark.sparkContext)
+
+dbfs_out_dir = '/tmp/ryansimpson/dataset'
+out_dir = '/dbfs' + dbfs_out_dir
+
+if dbutils.fs.mkdirs(dbfs_out_dir):
+    print(f"{dbfs_out_dir} already exists")
+
+# would be nice to be able to add these without a concrete path:
+sc.addPyFile("./pytorch-research/tutorial/db-connect/utils/Helpers.py")
+sc.addPyFile("./pytorch-research/tutorial/db-connect/utils/Logger.py")
+
+
+import Helpers
+import Logger
+
+data = Helpers.mnist_data(out_dir)
 # Create loader with data, so that we can iterate over it
 data_loader = torch.utils.data.DataLoader(data, batch_size=100, shuffle=True)
 # Num batches
@@ -70,104 +80,12 @@ num_batches = len(data_loader)
 
 # COMMAND ----------
 
-# DBTITLE 1,Discriminator
-class DiscriminatorNet(torch.nn.Module):
-    """
-    A three hidden-layer discriminative neural network
-    """
-    def __init__(self):
-        super(DiscriminatorNet, self).__init__()
-        n_features = 784
-        n_out = 1
-        
-        self.hidden0 = nn.Sequential( 
-            nn.Linear(n_features, 1024),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.3)
-        )
-        self.hidden1 = nn.Sequential(
-            nn.Linear(1024, 512),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.3)
-        )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.2),
-            nn.Dropout(0.3)
-        )
-        self.out = nn.Sequential(
-            torch.nn.Linear(256, n_out),
-            torch.nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        x = self.hidden0(x)
-        x = self.hidden1(x)
-        x = self.hidden2(x)
-        x = self.out(x)
-        return x
-      
+# Discriminator
 discriminator = DiscriminatorNet()
 
-# COMMAND ----------
-
-def images_to_vectors(images):
-    return images.view(images.size(0), 784)
-
-def vectors_to_images(vectors):
-    return vectors.view(vectors.size(0), 1, 28, 28)
-
-# COMMAND ----------
-
-# DBTITLE 1,Generator
-class GeneratorNet(torch.nn.Module):
-    """
-    A three hidden-layer generative neural network
-    """
-    def __init__(self):
-        super(GeneratorNet, self).__init__()
-        n_features = 100
-        n_out = 784
-        
-        self.hidden0 = nn.Sequential(
-            nn.Linear(n_features, 256),
-            nn.LeakyReLU(0.2)
-        )
-        self.hidden1 = nn.Sequential(            
-            nn.Linear(256, 512),
-            nn.LeakyReLU(0.2)
-        )
-        self.hidden2 = nn.Sequential(
-            nn.Linear(512, 1024),
-            nn.LeakyReLU(0.2)
-        )
-        
-        self.out = nn.Sequential(
-            nn.Linear(1024, n_out),
-            nn.Tanh()
-        )
-
-    def forward(self, x):
-        x = self.hidden0(x)
-        x = self.hidden1(x)
-        x = self.hidden2(x)
-        x = self.out(x)
-        return x
-      
+# Discriminator
 generator = GeneratorNet()
 
-# COMMAND ----------
-
-# we need some noise (Generators sample from noise, discriminators sample from the data)
-def noise(size):
-    '''
-    Generates a 1-d vector of gaussian sampled random values
-    '''
-    n = Variable(torch.randn(size, 100))
-    
-    return n
-
-# COMMAND ----------
 
 # ADAM as the optimization algorithm, learning rate of 0.0002
 # loss function for this task will be Binary Cross Entropy Loss (BCE)
@@ -177,64 +95,6 @@ d_optimizer = optim.Adam(discriminator.parameters(), lr=0.0002)
 g_optimizer = optim.Adam(generator.parameters(), lr=0.0002)
 
 loss = nn.BCELoss()
-
-# try to score real images as 1 and fake images as 0:
-def ones_target(size):
-    '''
-    Tensor containing ones, with shape = size
-    '''
-    data = Variable(torch.ones(size, 1))
-    return data
-
-def zeros_target(size):
-    '''
-    Tensor containing zeros, with shape = size
-    '''
-    data = Variable(torch.zeros(size, 1))
-    return data
-
-# COMMAND ----------
-
-def train_discriminator(optimizer, real_data, fake_data):
-    N = real_data.size(0)
-    # Reset gradients
-    optimizer.zero_grad()
-    
-    # 1.1 Train on Real Data
-    prediction_real = discriminator(real_data)
-    # Calculate error and backpropagate
-    error_real = loss(prediction_real, ones_target(N) )
-    error_real.backward()
-
-    # 1.2 Train on Fake Data
-    prediction_fake = discriminator(fake_data)
-    # Calculate error and backpropagate
-    error_fake = loss(prediction_fake, zeros_target(N))
-    error_fake.backward()
-    
-    # 1.3 Update weights with gradients
-    optimizer.step()
-    
-    # Return error and predictions for real and fake inputs
-    return error_real + error_fake, prediction_real, prediction_fake
-
-# COMMAND ----------
-
-def train_generator(optimizer, fake_data):
-    N = fake_data.size(0)
-    # Reset gradients
-    optimizer.zero_grad()
-    # Sample noise and generate fake data
-    prediction = discriminator(fake_data)
-    # Calculate error and backpropagate
-    error = loss(prediction, ones_target(N))
-    error.backward()
-    # Update weights with gradients
-    optimizer.step()
-    # Return error
-    return error
-
-# COMMAND ----------
 
 num_test_samples = 16
 test_noise = noise(num_test_samples)

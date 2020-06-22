@@ -1,0 +1,6 @@
+# databricks dbutils
+six
+#pytorch
+torch
+torchvision
+tensorboardX
