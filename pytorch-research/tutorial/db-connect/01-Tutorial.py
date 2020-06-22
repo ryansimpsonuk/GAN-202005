@@ -102,7 +102,7 @@ test_noise = noise(num_test_samples)
 # COMMAND ----------
 
 # Create logger instance
-logger = Logger(model_name='VGAN', data_name='MNIST', data_path_root='/dbfs/tmp/ryansimpson/dataset')
+logger = Logger(model_name='VGAN', data_name='MNIST', data_path_root=out_dir)
 # Total number of epochs to train
 num_epochs = 200
 for epoch in range(num_epochs):
