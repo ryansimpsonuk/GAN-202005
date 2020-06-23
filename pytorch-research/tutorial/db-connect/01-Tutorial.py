@@ -33,7 +33,11 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./00-utils
+# MAGIC %run ./utils/Helpers
+
+# COMMAND ----------
+
+# MAGIC %run ./utils/Logger
 
 # COMMAND ----------
 
@@ -55,8 +59,8 @@ from torchvision import transforms,datasets
 # ensure you've run source ~/db-connect.sh before running pyspark
 
 # session set-up:
-from pyspark.dbutils import DBUtils
-dbutils = DBUtils(spark.sparkContext)
+# from pyspark.dbutils import DBUtils
+# dbutils = DBUtils(spark.sparkContext)
 
 dbfs_out_dir = '/tmp/ryansimpson/dataset'
 out_dir = '/dbfs' + dbfs_out_dir
@@ -65,14 +69,14 @@ if dbutils.fs.mkdirs(dbfs_out_dir):
     print(f"{dbfs_out_dir} already exists")
 
 # would be nice to be able to add these without a concrete path:
-sc.addPyFile("./pytorch-research/tutorial/db-connect/utils/Helpers.py")
-sc.addPyFile("./pytorch-research/tutorial/db-connect/utils/Logger.py")
+# sc.addPyFile("./pytorch-research/tutorial/db-connect/utils/Helpers.py")
+# sc.addPyFile("./pytorch-research/tutorial/db-connect/utils/Logger.py")
 
 
-import Helpers
-import Logger
+# import Helpers
+# import Logger
 
-data = Helpers.mnist_data(out_dir)
+data = mnist_data(out_dir)
 # Create loader with data, so that we can iterate over it
 data_loader = torch.utils.data.DataLoader(data, batch_size=100, shuffle=True)
 # Num batches
@@ -115,13 +119,13 @@ for epoch in range(num_epochs):
         fake_data = generator(noise(N)).detach()
         # Train D
         d_error, d_pred_real, d_pred_fake = \
-              train_discriminator(d_optimizer, real_data, fake_data)
+              train_discriminator(d_optimizer, discriminator, real_data, fake_data)
 
         # 2. Train Generator
         # Generate fake data
         fake_data = generator(noise(N))
         # Train G
-        g_error = train_generator(g_optimizer, fake_data)
+        g_error = train_generator(g_optimizer, discriminator, fake_data)
         # Log batch error
         logger.log(d_error, g_error, epoch, n_batch, num_batches)
         # Display Progress every few batches

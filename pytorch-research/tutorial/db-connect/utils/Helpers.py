@@ -1,3 +1,4 @@
+# Databricks notebook source
 import torch
 from torch import nn, optim
 from torch.autograd.variable import Variable
@@ -5,6 +6,7 @@ from torchvision import transforms,datasets
 
 # COMMAND ----------
 
+# DBTITLE 1,Discriminator
 # note the use of the dbfs prefix here to allow us to use local file APIs to talk through the fuze mount:
 # https://docs.databricks.com/data/databricks-file-system.html#fuse
 
@@ -19,7 +21,6 @@ def mnist_data(out_dir):
 
     return datasets.MNIST(root=out_dir, train=True, transform=compose, download=True)
 
-# DBTITLE 1,Discriminator
 class DiscriminatorNet(torch.nn.Module):
     """
     A three hidden-layer discriminative neural network
@@ -56,6 +57,7 @@ class DiscriminatorNet(torch.nn.Module):
         x = self.out(x)
         return x
       
+
 # COMMAND ----------
 
 def images_to_vectors(images):
@@ -101,6 +103,7 @@ class GeneratorNet(torch.nn.Module):
         x = self.out(x)
         return x
       
+
 # COMMAND ----------
 
 # we need some noise (Generators sample from noise, discriminators sample from the data)
@@ -135,7 +138,7 @@ def zeros_target(size):
 
 # COMMAND ----------
 
-def train_discriminator(optimizer, real_data, fake_data):
+def train_discriminator(optimizer, discriminator,real_data, fake_data):
     N = real_data.size(0)
     # Reset gradients
     optimizer.zero_grad()
@@ -160,7 +163,7 @@ def train_discriminator(optimizer, real_data, fake_data):
 
 # COMMAND ----------
 
-def train_generator(optimizer, fake_data):
+def train_generator(optimizer, discriminator, fake_data):
     N = fake_data.size(0)
     # Reset gradients
     optimizer.zero_grad()
