@@ -65,6 +65,8 @@ from torchvision import transforms,datasets
 dbfs_out_dir = '/tmp/ryansimpson/dataset'
 out_dir = '/dbfs' + dbfs_out_dir
 
+dbutils.tensorboard.start(dbfs_out_dir + '/runs')
+
 if dbutils.fs.mkdirs(dbfs_out_dir):
     print(f"{dbfs_out_dir} already exists")
 
