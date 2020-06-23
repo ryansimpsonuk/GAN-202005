@@ -1,2 +1,6 @@
 # Databricks notebook source
-dbutils.tensorboard.start('/tmp/ryansimpson/dataset/runs')
+dbutils.fs.ls('/tmp/ryansimpson/dataset/runs/')
+
+# COMMAND ----------
+
+dbutils.tensorboard.start('/dbfs/tmp/ryansimpson/dataset/runs/')
